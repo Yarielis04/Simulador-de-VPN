@@ -1,0 +1,390 @@
+/*
+    SIMULADOR DE TUNEL VPN - COMP 2502
+    Criptografia y Teoria de Codigos
+    Yarielis Caraballo Rodríguez
+    5 de mayo de 2026
+
+   Algoritmos implementados:
+     1. Cifrado Cesar       (sustitucion clasica)
+     2. XOR                 (cifrado simetrico simple)
+     3. Hash simple         (integridad del mensaje)
+     4. Simulacion de tunel VPN completo paso a paso
+
+    Herramientas de apoyo: claude.ai, w3school, https://www.vpnranks.com/es-es/recursos/que-es-cifrado-vpn/, 
+    https://es.wizcase.com/blog/una-guia-completa-sobre-el-cifrado-de-vpn/?cq_acc=8263428290&cq_cmp=19309250605&cq_adg=149768598212&cq_term=&cq_plac=&cq_net=s&cq_mtype=&cq_dvc=c&cq_loc=9212920&tvar=&stvar=&gad_source=2&gad_campaignid=19309250605&gclid=Cj0KCQjwh-HPBhCIARIsAC0p3cfC_ZuA8hMP4igQHKXcgQjJy170fpzfnB7KZ-br338FAzklrecAtUoaAic-EALw_wcB
+ */
+
+#include <iostream>
+#include <string>
+#include <sstream>
+#include <iomanip>
+#include <vector>
+#include <cstdint>
+#include <algorithm>
+#include <locale>
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
+using namespace std;
+
+// ─── Colores ───────────────────────────────────────────
+#define RESET   "\033[0m"
+#define BOLD    "\033[1m"
+#define RED     "\033[31m"
+#define GREEN   "\033[32m"
+#define YELLOW  "\033[33m"
+#define CYAN    "\033[36m"
+#define MAGENTA "\033[35m"
+#define WHITE   "\033[37m"
+#define BLUE    "\033[34m"
+
+//  UTILIDADES DE DISPLAY
+void linea(char c = '=', int n = 60) {
+    cout << string(n, c) << "\n";
+}
+
+void titulo(const string& t) {
+    linea();
+    cout << BOLD << CYAN << "  " << t << RESET << "\n";
+    linea();
+}
+
+void paso(int n, const string& desc) {
+    cout << "\n" << BOLD << YELLOW << " [PASO " << n << "] " << RESET
+        << BOLD << desc << RESET << "\n";
+    linea('-', 45);
+}
+
+void mostrarCampos(const string& label, const string& valor, const string& color = WHITE) {
+    cout << "  " << BOLD << setw(22) << left << label << RESET
+        << color << valor << RESET << "\n";
+}
+
+void pausa() {
+    cout << "\n" << MAGENTA << "  Presiona ENTER para continuar..." << RESET;
+    cin.ignore();
+    cin.get();
+}
+
+//  ALGORITMO 1: CIFRADO CESAR
+class CifradoCesar {
+public:
+    static string cifrar(const string& texto, int clave) {
+        string resultado = texto;
+        for (char& c : resultado) {
+            if (isalpha(c)) {
+                char base = isupper(c) ? 'A' : 'a';
+                c = (char)((c - base + clave) % 26 + base);
+            }
+        }
+        return resultado;
+    }
+
+    static string descifrar(const string& texto, int clave) {
+        return cifrar(texto, 26 - (clave % 26));
+    }
+
+    static void mostrarProceso(const string& texto, int clave) {
+        cout << "\n  Tabla de sustitución (primeros 10 chars):\n";
+        cout << "  " << string(40, '-') << "\n";
+        cout << "  Original  ->  Cifrado  (desplazamiento: " << clave << ")\n";
+        cout << "  " << string(40, '-') << "\n";
+        int count = 0;
+        for (char c : texto) {
+            if (count >= 10) break;
+            if (isalpha(c)) {
+                char base = isupper(c) ? 'A' : 'a';
+                char cifrado = (char)((c - base + clave) % 26 + base);
+                cout << "     '" << c << "'  (" << (int)c << ")  ->  '"
+                    << cifrado << "'  (" << (int)cifrado << ")\n";
+                count++;
+            }
+        }
+    }
+};
+
+//  ALGORITMO 2: CIFRADO XOR (simula cifrado simetrico AES-like)
+class CifradoXOR {
+public:
+    static string cifrar(const string& texto, const string& clave) {
+        string resultado = texto;
+        for (size_t i = 0; i < texto.size(); i++) {
+            resultado[i] = texto[i] ^ clave[i % clave.size()];
+        }
+        return resultado;
+    }
+
+    // Devuelve representacion hexadecimal
+    static string aHex(const string& datos) {
+        ostringstream oss;
+        for (unsigned char c : datos) {
+            oss << hex << setw(2) << setfill('0') << (int)c << " ";
+        }
+        return oss.str();
+    }
+
+    static string desdeHex(const string& hex_str) {
+        return hex_str; // simplificado para demo
+    }
+};
+
+//  ALGORITMO 3: HASH SIMPLE (simula SHA-256)
+class HashSimple {
+public:
+    // Hash polinomial
+    static uint64_t calcular(const string& texto) {
+        uint64_t hash = 0xcbf29ce484222325ULL; // FNV offset basis
+        for (unsigned char c : texto) {
+            hash ^= c;
+            hash *= 0x100000001b3ULL;           // FNV prime
+        }
+        return hash;
+    }
+
+    static string aString(uint64_t hash) {
+        ostringstream oss;
+        oss << hex << uppercase << setw(16) << setfill('0') << hash;
+        return oss.str();
+    }
+};
+
+//  SIMULADOR DE TUNEL VPN COMPLETO
+class TunelVPN {
+private:
+    string ip_cliente = "192.168.1.10";
+    string ip_servidor = "10.0.0.1";
+    int    clave_cesar = 13;              // ROT13
+    string clave_xor = "VPN_KEY_2025"; // Clave sesión
+
+public:
+    void mostrarEncabezado() {
+        system("cls||clear");
+        linea('*');
+        cout << CYAN << "         Simulador de Tunel VPN\n" << RESET;
+        linea('*');
+        cout << "\n";
+    }
+
+    void simularConexion(const string& mensaje) {
+        mostrarEncabezado();
+
+        // ── PASO 1: Mensaje original ─────────────────────────
+        paso(1, "MENSAJE ORIGINAL (texto plano)");
+        mostrarCampos("Remitente (Cliente):", ip_cliente, GREEN);
+        mostrarCampos("Destino (Servidor):", ip_servidor, BLUE);
+        mostrarCampos("Mensaje:", mensaje, WHITE);
+        mostrarCampos("Estado:", "SIN CIFRAR - VULNERABLE", RED);
+
+        cout << "\n  " << RED << " Sin VPN: cualquier nodo intermedio puede leer esto." << RESET << "\n";
+        pausa();
+
+        // ── PASO 2: Generacion de claves ─────────────────────
+        paso(2, "HANDSHAKE VPN - Intercambio de Claves");
+        cout << "  Simulando intercambio seguro de claves:\n\n";
+        mostrarCampos("Clave Cesar (ROT):", to_string(clave_cesar), YELLOW);
+        mostrarCampos("Clave XOR:", clave_xor, YELLOW);
+        mostrarCampos("Hash de verificación:", "", YELLOW);
+        uint64_t hash_original = HashSimple::calcular(mensaje);
+        string   hash_str = HashSimple::aString(hash_original);
+        cout << "  " << BOLD << setw(22) << left << "" << RESET
+            << YELLOW << hash_str << RESET << "\n";
+        cout << "\n  " << GREEN << "  Claves intercambiadas de forma segura." << RESET << "\n";
+        pausa();
+
+        // ── PASO 3: Primera capa - Cesar ─────────────────────
+        paso(3, "CAPA 1 - Cifrado Cesar (ROT-13)");
+        string cifrado_cesar = CifradoCesar::cifrar(mensaje, clave_cesar);
+        CifradoCesar::mostrarProceso(mensaje, clave_cesar);
+        cout << "\n";
+        mostrarCampos("Entrada:", mensaje, WHITE);
+        mostrarCampos("Salida cifrada:", cifrado_cesar, CYAN);
+        pausa();
+
+        // ── PASO 4: Segunda capa - XOR ───────────────────────
+        paso(4, "CAPA 2 - Cifrado XOR ");
+        string cifrado_xor = CifradoXOR::cifrar(cifrado_cesar, clave_xor);
+        string cifrado_xor_hex = CifradoXOR::aHex(cifrado_xor);
+        mostrarCampos("Entrada:", cifrado_cesar, CYAN);
+        mostrarCampos("Clave sesion:", clave_xor, YELLOW);
+        mostrarCampos("Salida (hex):", cifrado_xor_hex, MAGENTA);
+        cout << "\n  " << GREEN << " Mensaje completamente ilegible en tránsito." << RESET << "\n";
+        pausa();
+
+        // ── PASO 5: Empaquetado VPN ──────────────────────────
+        paso(5, "ENCAPSULACION - Paquete VPN");
+        cout << "  ┌─────────────────────────────────────────┐\n";
+        cout << "  │  ENCABEZADO VPN                           │\n";
+        cout << "  │  Src: " << GREEN << ip_cliente << RESET
+            << "  ->  Dst: " << BLUE << ip_servidor << RESET << "       │\n";
+        cout << "  ├─────────────────────────────────────────┤\n";
+        cout << "  │  PAYLOAD CIFRADO (XOR + Cesar)          │\n";
+        cout << "  │  " << MAGENTA << cifrado_xor_hex.substr(0, 35) << "...│\n" << RESET;
+        cout << "  ├─────────────────────────────────────────┤\n";
+        cout << "  │  HASH: " << YELLOW << hash_str.substr(0, 16) << "...     │\n" << RESET;
+        cout << "  └─────────────────────────────────────────┘\n";
+        pausa();
+
+        // ── PASO 6: Transmision ──────────────────────────────
+        paso(6, "TRANSMISION POR INTERNET (Tunel cifrado)");
+        cout << "\n";
+        cout << "  " << GREEN << ip_cliente << RESET
+            << "  ══[TUNEL VPN CIFRADO]══>  "
+            << BLUE << ip_servidor << RESET << "\n\n";
+        cout << "  Nodos intermedios ven solo:\n";
+        cout << "  " << MAGENTA << cifrado_xor_hex.substr(0, 48) << "\n" << RESET;
+        cout << "\n  " << GREEN << " Hacker intercepta... pero no puede descifrar." << RESET << "\n";
+        pausa();
+
+        // ── PASO 7: Descifrado en servidor ───────────────────
+        paso(7, "DESCIFRADO EN EL SERVIDOR");
+        string desc_xor = CifradoXOR::cifrar(cifrado_xor, clave_xor); // XOR es simétrico
+        string desc_cesar = CifradoCesar::descifrar(desc_xor, clave_cesar);
+
+        mostrarCampos("Paquete recibido (hex):", cifrado_xor_hex.substr(0, 30) + "...", MAGENTA);
+        mostrarCampos("Tras descifrar XOR:", desc_xor, CYAN);
+        mostrarCampos("Tras descifrar Cesar:", desc_cesar, GREEN);
+        pausa();
+
+        // ── PASO 8: Verificacion de integridad ───────────────
+        paso(8, "VERIFICACION DE INTEGRIDAD (Hash)");
+        uint64_t hash_recibido = HashSimple::calcular(desc_cesar);
+        bool     ok = (hash_recibido == hash_original);
+
+        mostrarCampos("Hash original:", hash_str, YELLOW);
+        mostrarCampos("Hash recalculado:", HashSimple::aString(hash_recibido),
+            ok ? GREEN : RED);
+
+        if (ok) {
+            cout << "\n  " << BOLD << GREEN
+                << "  MENSAJE INTEGRO - No fue modificado en tránsito." << RESET << "\n";
+        }
+        else {
+            cout << "\n  " << BOLD << RED
+                << " ALERTA: El mensaje fue alterado!" << RESET << "\n";
+        }
+        pausa();
+
+        // ── RESUMEN ──────────────────────────────────────────
+        titulo("RESUMEN DEL TUNEL VPN");
+        mostrarCampos("Mensaje original:", mensaje, WHITE);
+        mostrarCampos("Mensaje cifrado (hex):", cifrado_xor_hex.substr(0, 25) + "...", MAGENTA);
+        mostrarCampos("Mensaje descifrado:", desc_cesar, GREEN);
+        mostrarCampos("Integridad:", ok ? "VERIFICADA " : "FALLIDA ✘", ok ? GREEN : RED);
+        mostrarCampos("Protocolo capa 1:", "Cifrado Cesar (ROT-" + to_string(clave_cesar) + ")", CYAN);
+        mostrarCampos("Protocolo capa 2:", "Cifrado XOR (sesion)", CYAN);
+        mostrarCampos("Integridad:", "Hash FNV-64", CYAN);
+        cout << "\n";
+        linea();
+    }
+};
+
+//  MENU DE DEMOSTRACIONES INDIVIDUALES
+void Cesar() {
+    titulo("CIFRADO CESAR");
+    string msg;
+    int    clave;
+    cout << "  Ingresa un mensaje: ";
+    getline(cin >> ws, msg);
+    cout << "  Ingresa la clave (1-25): ";
+    cin >> clave;
+
+    string cifrado = CifradoCesar::cifrar(msg, clave);
+    string descifrado = CifradoCesar::descifrar(cifrado, clave);
+
+    cout << "\n";
+    mostrarCampos("Original:", msg, WHITE);
+    mostrarCampos("Cifrado:", cifrado, CYAN);
+    mostrarCampos("Descifrado:", descifrado, GREEN);
+    CifradoCesar::mostrarProceso(msg, clave);
+}
+
+void XOR() {
+    titulo("CIFRADO XOR");
+    string msg, clave;
+    cout << "  Ingresa un mensaje: ";
+    getline(cin >> ws, msg);
+    cout << "  Ingresa la clave: ";
+    getline(cin >> ws, clave);
+
+    string cifrado = CifradoXOR::cifrar(msg, clave);
+    string hex = CifradoXOR::aHex(cifrado);
+    string desc = CifradoXOR::cifrar(cifrado, clave);
+
+    cout << "\n";
+    mostrarCampos("Original:", msg, WHITE);
+    mostrarCampos("Cifrado (hex):", hex, MAGENTA);
+    mostrarCampos("Descifrado:", desc, GREEN);
+}
+
+void Hash() {
+    titulo("FUNCION HASH");
+    string msg;
+    cout << "  Ingresa un mensaje: ";
+    getline(cin >> ws, msg);
+
+    uint64_t h = HashSimple::calcular(msg);
+    cout << "\n";
+    mostrarCampos("Mensaje:", msg, WHITE);
+    mostrarCampos("Hash (FNV-64):", HashSimple::aString(h), YELLOW);
+    cout << "\n  " << CYAN
+        << "  Nota: cambiar 1 caracter produce un hash completamente distinto."
+        << RESET << "\n";
+
+    // Demo de avalanche effect
+    string msg2 = msg;
+    if (!msg2.empty()) msg2[0] ^= 1;
+    uint64_t h2 = HashSimple::calcular(msg2);
+    mostrarCampos("Mensaje alt:", msg2, WHITE);
+    mostrarCampos("Hash alt:", HashSimple::aString(h2), RED);
+}
+
+
+//  MENU PRINCIPAL
+
+int main() {
+    setlocale(LC_ALL, "spanish");
+#ifdef _WIN32
+    // Habilitar colores ANSI en Windows 10+
+    HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+    DWORD mode = 0;
+    GetConsoleMode(hOut, &mode);
+    SetConsoleMode(hOut, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+#endif
+
+    int opcion = 0;
+    do {
+        system("cls||clear");
+        linea('*');
+        cout << BOLD << CYAN
+            << "\n   SIMULADOR VPN - Criptografía y Teoria de Códigos\n"
+            << "\n\n" << RESET;
+        linea('-');
+        cout << CYAN << "  [2]" << RESET << " Cifrado Cesar\n";
+        cout << MAGENTA << "  [3]" << RESET << " Cifrado XOR\n";
+        cout << GREEN << "  [1]" << RESET << " Simulación completa de Tunel VPN\n";
+        cout << YELLOW << "  [4]" << RESET << " Función Hash\n";
+        cout << RED << "  [5]" << RESET << " Salir\n";
+        linea('-');
+        cout << "  Opción: ";
+        cin >> opcion;
+
+        switch (opcion) {
+        case 1: {
+            string msg;
+            cout << "\n  Ingresa el mensaje a enviar por VPN: ";
+            getline(cin >> ws, msg);
+            TunelVPN vpn;
+            vpn.simularConexion(msg);
+            break;
+        }
+        case 2: Cesar(); pausa(); break;
+        case 3: XOR();   pausa(); break;
+        case 4: Hash();  pausa(); break;
+        case 5: cout << GREEN << "\n  ¡Hasta luego!\n" << RESET; break;
+        default: cout << RED << "\n  Opción inválida.\n" << RESET;
+        }
+    } while (opcion != 5);
+
+    return 0;
+}
